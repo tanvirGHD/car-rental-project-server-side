@@ -1,5 +1,4 @@
 
-
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -54,6 +53,7 @@ async function run() {
     });
 
 
+
     // Update
     app.put('/cars/:id', async(req, res) =>{
       const id = req.params.id;
@@ -86,6 +86,15 @@ async function run() {
     })
 
 
+    // delete 
+    app.delete('/cars-booking/:id', async(req, res)=> {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await bookingCarCollection.deleteOne(query)
+      res.send(result)
+    })
+
+
     // Get car details by ID
     app.get('/cars/:id', async (req, res) => {
       const id = req.params.id;
@@ -98,6 +107,26 @@ async function run() {
     app.post('/cars-booking', async (req, res) => {
       const booking = req.body;
       const result = await bookingCarCollection.insertOne(booking);
+      // //count
+      const id = booking._id;
+      const query = {_id: new ObjectId(id)}
+      const book = await bookingCarCollection.findOne(query)
+      let newCount = 0;
+      if(book.bookingCount){
+        newCount = book.bookingCount + 1;
+      }
+      else{
+        newCount = 1;
+      }
+
+      //update
+      const filter = {_id: new ObjectId(id)};
+      const updatedDoc = {
+        $set: {
+          bookingCount: newCount
+        }
+      }
+      const updateResult = await bookingCarCollection.updateOne(filter, updatedDoc)
       res.send(result);
     });    
 
