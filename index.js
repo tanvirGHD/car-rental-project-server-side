@@ -39,6 +39,7 @@ async function run() {
       res.send(result);
     });
 
+    //car booking
     app.get('/cars-booking', async (req, res) => {
       const cursor = bookingCarCollection.find();
       const result = await cursor.toArray();
@@ -52,6 +53,37 @@ async function run() {
       res.send(result);
     });
 
+
+    // Update
+    app.put('/cars/:id', async(req, res) =>{
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const options = {upsert: true}
+      const updateCars = req.body;
+      const cars = {
+        $set:{
+          model: updateCars.model,
+          dailyRentalPrice: updateCars.dailyRentalPrice,
+          availability: updateCars.availability,
+          registrationNumber: updateCars.registrationNumber,
+          features: updateCars.features,
+          description: updateCars.description,
+          images: updateCars.images,
+          additionalInfo: updateCars.additionalInfo,
+        }
+      }
+      const result = await carsCollection.updateOne(filter, cars, options);
+      res.send(result)
+    })
+
+
+    // delete
+    app.delete('/cars/:id', async(req, res)=> {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await carsCollection.deleteOne(query)
+      res.send(result)
+    })
 
 
     // Get car details by ID
