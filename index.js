@@ -6,13 +6,15 @@ const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
-
 const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173'],
+  origin: ['http://localhost:5173',
+    'https://car-rent-project-c2e65.web.app',
+    'https://car-rent-project-c2e65.firebaseapp.com'
+  ],
   credentials: true
 }));
 app.use(express.json());
@@ -31,7 +33,7 @@ const verifyToken = (req, res, next) =>{
     if(err){
       return res.status(401).send({message: 'unauthorized access'});
     }
-    
+    req.user = decoded;
     next();
   })
 }
@@ -51,55 +53,56 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.connect();
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     // Database Collections
     const carsCollection = client.db('carRent').collection('cars');
     const bookingCarCollection = client.db('carRent').collection('cars-booking');
 
 
+
     //Auth related API
     app.post('/jwt', (req, res) =>{
       const user = req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '5h'});
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '10h'});
 
       res.cookie('token', token, {
         httpOnly: true,
-        secure: false
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
       })
-      .send({success: true})
+      .send({message: 'Token created and sent to client'});
     })
 
-
+// clearing token
     app.post('/logout', (req, res)=>{
       res.clearCookie('token', {
         httpOnly: true,
-        secure: false
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
       })
-      .send({success: true})
-    })
-
+      .send({message: 'Logged out'})
+    });
 
 
     // Get all cars
     app.get('/cars', verifyToken, async (req, res) => {
       const cursor = carsCollection.find();
-      // console.log(req.cookies?.token);
       const result = await cursor.toArray();
       res.send(result);
     });
 
 
-    //car booking
-    app.get('/cars-booking', async (req, res) => {
+    //car booking ++
+    app.get('/cars-booking', verifyToken, async (req, res) => {
       const cursor = bookingCarCollection.find();
       const result = await cursor.toArray();
       res.send(result);
     });
 
     // Add a car
-    app.post('/cars', async (req, res) => {
+    app.post('/cars',verifyToken, async (req, res) => {
       const newCar = req.body;
       const result = await carsCollection.insertOne(newCar);
       res.send(result);
@@ -156,32 +159,58 @@ async function run() {
       res.send(result);
     });
 
-    // Book a car
-    app.post('/cars-booking', async (req, res) => {
-      const booking = req.body;
-      const result = await bookingCarCollection.insertOne(booking);
-      // //count
-      const id = booking._id;
-      const query = {_id: new ObjectId(id)}
-      const book = await bookingCarCollection.findOne(query)
-      let newCount = 0;
-      if(book.bookingCount){
-        newCount = book.bookingCount + 1;
-      }
-      else{
-        newCount = 1;
-      }
 
-      //update
-      const filter = {_id: new ObjectId(id)};
-      const updatedDoc = {
-        $set: {
-          bookingCount: newCount
-        }
+   
+
+    // Get car details by ID
+    app.get('/cars/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await carsCollection.findOne(query);
+      if (result) {
+        res.send(result); // Send all car details if found
+      } else {
+        res.status(404).send({ success: false, message: "Car not found." });
       }
-      const updateResult = await bookingCarCollection.updateOne(filter, updatedDoc)
-      res.send(result);
-    });    
+    });
+
+
+// Book a car
+app.post('/cars-booking', async (req, res) => {
+  const booking = req.body;
+
+  try {
+      // Extract the car model from the booking
+      const carModel = booking.model;
+
+      // Check if the car model already exists in the bookingCar collection
+      const existingCar = await bookingCarCollection.findOne({ model: carModel });
+
+      if (existingCar) {
+          // If the car model already exists, just increment the booking count
+          const updateResult = await bookingCarCollection.updateOne(
+              { model: carModel },
+              {
+                  $inc: { bookingCount: 1 },  
+              }
+          );
+
+          if (updateResult.modifiedCount > 0) {
+              res.status(200).send({ success: true, message: "Booking count updated." });
+          } else {
+              res.status(400).send({ success: false, message: "Failed to update booking count." });
+          }
+      } else {
+          // If the car doesn't exist, add the booking and initialize the bookingCount
+          const bookingWithCount = { ...booking, bookingCount: 1 };  
+          await bookingCarCollection.insertOne(bookingWithCount);
+          res.status(200).send({ success: true, message: "New booking added." });
+      }
+  } catch (error) {
+      console.error("Error booking car:", error);
+      res.status(500).send({ success: false, message: "Error booking car." });
+  }
+});
 
   } catch (error) {
     console.error("Error connecting to MongoDB:", error.message);
