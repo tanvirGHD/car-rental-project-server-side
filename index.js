@@ -53,12 +53,13 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // await client.connect();
+
     // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     // Database Collections
     const carsCollection = client.db('carRent').collection('cars');
     const bookingCarCollection = client.db('carRent').collection('cars-booking');
+
 
 
 
@@ -87,7 +88,7 @@ async function run() {
 
 
     // Get all cars
-    app.get('/cars', verifyToken, async (req, res) => {
+    app.get('/cars', async (req, res) => {
       const cursor = carsCollection.find();
       const result = await cursor.toArray();
       res.send(result);
