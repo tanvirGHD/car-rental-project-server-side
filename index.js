@@ -20,7 +20,6 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-
 const verifyToken = (req, res, next) =>{
   const token = req.cookies?.token;
   
@@ -53,15 +52,11 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-
     // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     // Database Collections
     const carsCollection = client.db('carRent').collection('cars');
     const bookingCarCollection = client.db('carRent').collection('cars-booking');
-
-
-
 
     //Auth related API
     app.post('/jwt', (req, res) =>{
@@ -110,8 +105,7 @@ async function run() {
     });
 
 
-
-    // Update
+    // Update all car
     app.put('/cars/:id', async(req, res) =>{
       const id = req.params.id;
       const filter = {_id: new ObjectId(id)}
@@ -229,3 +223,6 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`Car rent app running on port: ${port}`);
 });
+
+
+
